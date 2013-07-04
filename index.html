@@ -1,0 +1,423 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+	<head>
+   	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+		<meta name="viewport" content="width=640, user-scalable=no, initial-scale=0.5, minimum-scale=0.5, maximum-scale=0.5" />
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black">
+		<link rel="apple-touch-icon" href="images/instagram-springboard.png">
+    <link href='http://fonts.googleapis.com/css?family=Titan+One' rel='stylesheet' type='text/css'>
+
+
+
+		<title>InstaNear</title>
+		<style>
+		  body {
+    		  margin: 0;
+    		  padding: 0;
+    		  position: absolute;
+    		  top: 0; bottom: 0;
+    		  left: 0; right: 0;
+          overflow: hidden;
+    		  font-family: Helvetica;
+          -webkit-perspective: 150;
+		  }
+      #app {
+        position: absolute;
+        top: 0; bottom: 0;
+        left: 0; right: 0;
+        overflow: hidden;
+      }
+
+		  #thumbnails>.header {
+    		  padding: 10px;
+    		  color: #fff;
+          /*
+          background: -webkit-gradient(linear, left top, left bottom, from(#7fcdf3), to(#4a8fda));
+          text-align: center;
+          */
+          background: #517fa4;
+    		  box-shadow: 0 1px 0 #0077c5, inset 0 1px 0 #aee8f9;
+    		  text-shadow: 0px 1px 0px rgba(60, 60, 60, 0.7);
+    		  font-family: Helvetica;
+    		  font-size: 16px;
+    		  z-index: 20;
+          line-height: 2em;
+          height: 2em;
+          position: fixed;
+          left: 0; right: 0;
+          top: 0;
+		  }
+      .header #refresh {
+          position: absolute;
+          right: 10px;
+      }
+      .header #config {
+          position: absolute;
+          left: 10px;
+      }
+      .header #address {
+          display: inline-block;
+      }
+
+      #thumbnails {
+          overflow: hidden;
+          position: absolute;
+          top: 0; bottom: 0;
+          left: 0; right: 0;
+          -webkit-transition: all 0.7s;
+      }
+
+      #thumbnails>.body {
+          position: absolute;
+          left: 0; right: 0;
+          top: 0; bottom: 0;
+          overflow-y: scroll;
+      }
+      #thumbnails>.body>.wrapper {
+          max-width: 1024px;
+          min-width: 800px;
+          margin: 3em auto 0;
+          padding: 20px 0;
+          background: #efefef;
+          overflow-y: scroll;
+      }
+
+      .thumb {
+          display: inline-block;
+          width: 20%;
+      }
+      .thumb .wrapper {
+          padding: 5px 5px;
+          /*border: 1px solid #eee;*/
+          margin: 20px;
+          position: relative;
+          -webkit-box-shadow: 0 0 0 1px rgba(0,0,0,.04), 0 1px 5px rgba(0,0,0,0.1);
+          background: #fff;
+          /*text-align: center;*/
+      }
+      .thumb .wrapper .img {
+          padding-bottom: 100%;
+          background-size: 100% 100%;
+          z-index: 3;
+          position: relative;
+      }
+      .thumb .wrapper .expander {
+          -webkit-transition: all 0.1s;
+          background: #fff;
+          box-shadow: 0 0 0 1px rgba(0,0,0,.04), 0 1px 5px rgba(0,0,0,0.1);
+          position: absolute;
+          top: 0px; bottom: 0px;
+          left: 0; right: 0;
+      }
+      .thumb:hover .wrapper .expander {
+          margin: -28px -8px;
+      }
+      .thumb .wrapper .username, .thumb .wrapper .date {
+        /* change the font */
+          opacity: 0;
+          position: absolute;
+          -webkit-transition: opacity 0.3s;
+          text-align: center;
+          left: 0; right: 0;
+          color: #777;
+          font-size: 11px;
+        }
+      .thumb .wrapper .date {
+          bottom: 10px;
+      }
+      .thumb .wrapper .username {
+          top: 10px;
+      }
+      .thumb:hover .wrapper .username, .thumb:hover .wrapper .date {
+          opacity: 1;
+      }
+
+      .thumb .fade-in {
+          position: absolute;
+          -webkit-transition: opacity 1s;
+          opacity: 0;
+          top: 7px;
+          cursor: pointer;
+      }
+      .thumb .fade-in:hover {
+          margin: -28px -12px;
+          padding: 28px 12px;
+      }
+
+      .thumb .hidden {
+          opacity: 0;
+      }
+
+		  .placeholder {
+    		  position: absolute;
+    		  top: 45px;
+          left: 32px;    		  
+    		  height: 70px;
+    		  width: 70px;
+    		  opacity: 0.45;
+    		  z-index: 2;
+    		  pointer-events: none;
+		  }
+		  .hidden, .fadeout {
+    		  opacity: 0;    		  
+		  }
+
+      #load-more {
+          width: 80%;
+          text-align: center;
+          margin: 10px 5%;
+          line-height: 2em;
+          border-radius: 5px;
+          background: -webkit-gradient(linear, left top, left bottom, from(#7fcdf3), to(#4a8fda));
+          color: #fff;
+    		  box-shadow: 0 1px 0 #0077c5, inset 0 1px 0 #aee8f9;
+    		  text-shadow: 0px 1px 0px rgba(60, 60, 60, 0.7);
+    		  font-family: Helvetica;
+          cursor: pointer;
+      }
+      #load-more:active {
+          background: #000;
+          position: relative;
+          top: 2px;
+      }
+		  
+      .blur {
+          -webkit-filter: blur(4px);
+          -webkit-transform: translate3d(0, 55px, -25px);
+          pointer-events: none;
+      }
+
+      #detail {
+        position: absolute;
+        top: 0; bottom: 0;
+        left: 0; right: 0;
+        overflow: hidden;
+        z-index: 40;
+        pointer-events: none;
+      }
+      #detail.active {
+        pointer-events: all;
+      }
+      #detail .wrapper {
+        position: absolute;
+        top: 30px; bottom: 0;
+        left: 40px; right: 40px;
+        z-index: 30;
+        overflow: hidden;
+        min-width: 800px;
+        -webkit-transform: translate3d(0, 100%, 0);
+        -webkit-transition: all cubic-bezier(0.250, 0.460, 0.450, 0.940) 0.7s;
+      }
+      #detail.active .wrapper {
+        -webkit-transform: translate3d(0, 0, 0);
+      }
+      #detail #modal {
+        position: absolute;
+        top: 0; bottom: 0; left: 0; right: 0;
+        background: rgba(0, 0, 0, 0.6);
+        opacity: 0;
+        z-index: -1;
+        -webkit-transition: all 0.5s;
+      }
+      #detail.active #modal {
+        opacity: 1;
+        z-index: 1;
+      }
+      #detail .wrapper .header {
+        padding: 10px;
+        position: absolute;
+        left: 20px;
+        z-index: 10;
+        top: 15px;
+        height: 2em;
+        font-family: 'freight-sans-pro', 'proxima-nova', 
+                     'Helvetica Neue', Arial, 
+                     Helvetica, sans-serif;
+        background: #edebf1;
+        line-height: 40px;
+        font-size: 19px;
+        color: #444;
+        text-shadow: none;
+        border-radius: 5px;
+        border: 1px solid #555;
+        box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+      }
+      #profile-pic {
+        height: 40px;
+        width: 40px;
+        border-radius: 3px;
+        border: 1px solid rgba(189, 189, 189, 0.8);
+        float: left;
+        margin-right: 12px;
+      }
+
+      #photo-detail {
+        width: 612px;
+        height: 612px;
+        position: absolute;
+        top: 50px;
+        left: 10px;
+      }
+      #photo-detail img {
+        border-bottom-left-radius: 5px;
+        border-left: 1px solid black;
+        border-top: 1px solid black;
+        border-bottom: 1px solid black;
+      }
+
+      #detail-description {
+        position: absolute;
+        bottom: 0px;
+        left: 10px;
+        right: 10px;
+        margin: 10px;
+        padding: 10px;
+        background: rgba(0,0,0, 0.7);
+        color: #fff;
+        font-size: 13px;
+        border-radius: 4px;
+      }
+
+      #detail .hidden {
+        position: absolute;
+        opacity: 0;
+        z-index: -1;
+      }
+
+      #photo-metadata {
+        position: absolute;
+        left: 622px;
+        right: 10px;
+        top: 50px;
+        height: 120px; 
+        background: #fff;
+        border-top-right-radius: 5px;
+      }
+      #filter span {
+
+      }
+
+      #map {
+        height: 100%;
+        width: 100%;
+      }
+
+      #default-map-container {
+        height: 1px;
+        width: 1px;
+      }
+      #detail-map-container {
+         position: absolute;
+         border: 1px solid black;
+         left: 622px;
+         right: 10px;
+         top: 170px;
+         height: 492px;
+         border-bottom-right-radius: 5px;
+      }
+      #location-map-container {
+      }
+
+
+      #detail .wrapper .footer {
+        -webkit-transform: rotate(90deg);
+        font-size: 45px;
+        position: absolute;
+        bottom: 2px;
+        left: 50%;
+        color: #fff;
+        text-shadow: 3px 0 0 rgba(0, 0, 0, 0.5);
+        font-family: "Titan One";
+        cursor: pointer;
+      }
+
+		  @media only screen and (-webkit-min-device-pixel-ratio: 2) and (width: 640px) { 
+        #thumbnails>.body {
+          z-index: 15;
+          background: #efefef;
+          overflow: hidden;
+          overflow-y: scroll;
+        }
+        #thumbnails>.body>.wrapper {
+          box-sizing: border-box;
+          width: 576px;
+          min-width: 576px;
+          padding-left: 8px;
+        }
+        .thumb {
+          width: 33%;
+        }
+        .thumb .wrapper {
+          -webkit-box-shadow: none;
+          margin: 0;
+          background: none;
+        }
+        .thumb .wrapper .expander {
+          background: none;
+          box-shadow: none;
+        }
+        .thumb .wrapper .img {
+          border-radius: 8px;
+          border: 5px solid black;
+        }
+
+        #detail .wrapper {
+          min-width: 612px;
+          width: 612px;
+        }
+        #detail .wrapper .header {
+          font-size: 29px;
+          height: 65px;
+          line-height: 60px;
+        }
+        #profile-pic {
+          height: 60px;
+          width: 60px;
+        }
+        #map-container {
+          height: 160px;
+          top: 665px;
+          left: 10px;
+        }
+        #photo-detail {
+          width: 612px;
+          height: 612px;
+          left: 0;
+        }
+        #photo-detail img {
+          height: 100%; width: 100%;
+        }
+        #detail-description {
+          font-size: 28px;
+          border-radius: 10px;
+        }
+		  }
+		  @media only screen and (-webkit-min-device-pixel-ratio: 2) and (width: 960px) { 
+        #thumbnails>.body>.wrapper {
+          width: 640px;
+          min-width: auto;
+        }
+		  }
+
+		</style>
+	</head>
+	
+  <body>
+    <div id="app" ng-app="InstaNear">
+      <div ng-controller="pageController"></div>
+      <div ng-include="'templates/thumb.html'"></div>
+      <!--<ng-view></ng-view>-->
+      <div id="map"></div>
+  </div>
+
+
+        <script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?sensor=false"></script>
+      
+       <script type="text/javascript" src="js/jquery-1.10.1.js"></script>
+       <script type="text/javascript" src="js/angular.js"></script>
+       <script type="text/javascript" src="js/instanear.js"></script>
+       <script type="text/javascript" src="js/data.js"></script>
+       <script type="text/javascript" src="js/instagram-client-id.js"></script>
+	</body>
+</html>

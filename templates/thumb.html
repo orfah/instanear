@@ -1,0 +1,29 @@
+    <div id="thumbnails" ng-controller="thumbCtrl" ng-class='{blur: blur}'>
+      <div class="header">
+        <!--<img id="config" src="resources/refresh.png" tap="showConfig()">
+        <img id="refresh" src="resources/refresh.png" tap="refresh()">
+        -->
+        <span id="address">{{address}}</span>
+      </div>
+      <div class="body">
+        <div class="wrapper">
+          <div ng-repeat="photo in photos" class="thumb">
+            <div class="wrapper">
+              <div class="expander">
+                <div class="username" >{{photo.username}}</div>
+                <div class="date">{{photo.when}}</div>
+              </div>
+              <img src="{{photo.thumbnail}}" class="fade-in hidden" loaded="imageLoaded">
+              <div class="img" tap="showDetail('{{photo.id}}')" style="background-image: url({{photo.src}})"></div>
+            </div>
+          </div>
+          <div id="load-more" tap="loadMore()">load more...</div>
+        </div>
+      </div>
+
+      <div id="img-loading"></div>
+    </div>
+    <detail></detail>
+    <config></config>
+    <location></location>
+    <div id="map"></div>

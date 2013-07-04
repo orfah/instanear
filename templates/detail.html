@@ -1,0 +1,25 @@
+    <div id="detail" ng-controller="detailCtrl" ng-class="{active: active}">
+      <div id="modal"></div>
+      <div class="wrapper">
+        <div class="header">
+          <img id="profile-pic" src="{{photo.profile}}">
+          {{photo.username}}
+        </div>
+        <div class="body">
+          <div id="detail-map-container"></div>
+          <div id="photo-metadata">
+            <p id="filter">Filter: <span>{{photo.meta.filter}}</span></p>
+            <p id="likes"><span>{{photo.meta.likes}}</span></p>
+            <p id="comments"><span>{{photo.meta.comments.count}}</span></p>
+          </div>
+          <div id="photo-detail">
+            <!--<img src="{{photo.img.url}}" class="hidden fade-in" swap>-->
+            <img src="{{photo.img.url}}">
+            <div id="detail-description">{{photo.caption}}</div>
+          </div>
+        </div>
+        <div class="footer" tap="hide()">
+          &gt;&gt;
+        </div>
+      </div>
+    </div>
