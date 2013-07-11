@@ -1,0 +1,27 @@
+    <div id="location" ng-controller="locationCtrl" ng-class="{active: active}">
+      <div class="wrapper">
+        <div class="header">
+          Location Config
+        </div>
+
+        <div class="body">
+          <div id="location-radius">
+            <div id="radius-1" class="radius-level" tap="radius(1000)" 
+              ng-class="{filled: radius()>=1000}"></div>
+            <div id="radius-2" class="radius-level" tap="radius(2500)" 
+              ng-class="{filled: radius()>=2500}"></div>
+            <div id="radius-3" class="radius-level" tap="radius(4000)" 
+              ng-class="{filled: radius()>=4000}"></div>
+            <div id="radius-4" class="radius-level" tap="radius(6000)" 
+              ng-class="{filled: radius()>=6000}"></div>
+            <div id="radius-5" class="radius-level" tap="radius(8500)" 
+              ng-class="{filled: radius()>=8500}"></div>
+            <div id="radius-person" tap="radius(1000)" ></div>
+          </div>
+          <div id="location-map-container"></div>
+        </div>
+        <div class="footer" tap="hide()">
+          &gt;&gt;
+        </div>
+      </div>
+    </div>
