@@ -1,3 +1,4 @@
+var blahloc;
 var instanear = angular.module("InstaNear", []),
     InstaNear = {
         setPhotos: function() {
@@ -27,6 +28,19 @@ instanear.config(['$routeProvider',
     }
 ]);
 
+instanear.factory('Globals',
+    function() {
+        var globals = {},
+            radius = 4000;
+
+        globals.radius = function(r) {
+            if (typeof r === 'number') { radius = r; }
+            return radius;
+        };
+
+        return globals;
+    }
+);
 instanear.factory('BrowserHistory', 
     ['$location',
     function($location) {
@@ -37,14 +51,13 @@ instanear.factory('BrowserHistory',
 
         factory.lastRoute = function(r) {
             if (typeof r === 'string') {
-                console.log('setting lastRoute: ' + r);
                 lastRoute = r;
             }
             return lastRoute;
         };
 
         factory.action = function(a) {
-            if (a) { action = a; }
+            if (typeof a == 'string') { action = a; }
             return action;
         }
         factory.route = function(r) {
@@ -73,28 +86,33 @@ instanear.factory('ClientLocation',
             },
             setLocation = function(pos) {
                 clientLocation = pos;
-                defer.resolve(getLocation())
+                return defer.resolve(getLocation())
             };
 
         factory.locationNeeded = function() {
             return clientLocation === undefined;
         };
         factory.setLocation = function(pos) {
-            setLocation(pos);
+            clientLocation = pos;
+          //  setLocation(pos);
         };
 
         // this needs to be renamed, it's confusing.  Should be something
         // like fetchLocation.
         factory.getLocation = function() {
             navigator.geolocation.getCurrentPosition(
-                function(pos) { console.log('got position'); $rootScope.$apply(setLocation(pos)); },
-                function(reason) { console.log('failed position'); return defer.reject(reason); },
+                function(pos) { $rootScope.$apply(setLocation(pos)); },
+                function(reason) { return defer.reject(reason); },
                 1000
             )
         };
 
         factory.location = function() {
+            if (!clientLocation) {
+                return undefined; //this.promise();
+            }
             return getLocation();
+
         };
         factory.promise = function() {
             this.getLocation();
@@ -103,22 +121,6 @@ instanear.factory('ClientLocation',
         return factory;
     }]
 );
-
-instanear.factory('Utility', function() {
-    var utilities = {};
-    utilities.showMap = function(targetId) {
-        var m = $('#map'),
-            previousId;
-        if (!m.hasClass(targetId)) {
-            previousId = m.parent().attr('id');
-            m = m.detach();
-            $('#' + targetId).append(m); 
-
-            m.removeClass(previousId);
-            m.addClass(targetId);
-        }
-    }
-});
 
 instanear.factory('Error', function() {
     var factory = {},
@@ -178,10 +180,9 @@ instanear.factory('Photo', function() {
 });
 
 instanear.factory('Instagram', 
-    ['$q', '$http', 'Error', 'Photo', 'ClientLocation',
-    function($q, $http, Error, Photo, ClientLocation) {
+    ['$q', '$http', 'ClientLocation', 'Error', 'Globals', 'Photo',
+    function($q, $http, ClientLocation, Error, Globals, Photo) {
         var factory = {},
-            defaultRadius = 4000,
             // defer object for running $http
             deferred = $q.defer(),
 
@@ -233,7 +234,7 @@ instanear.factory('Instagram',
                     response;
             },
 
-            fetch = function(lat, lng, dist, maxTime) {
+            search = function(lat, lng, dist, maxTime) {
                 var url = 
                     "https://api.instagram.com/v1/media/search?lat=" + lat +
                     "&lng=" + lng + 
@@ -248,26 +249,38 @@ instanear.factory('Instagram',
                     .then(addPhotos, Error.setError);
                  
                 //addPhotos(instaData);
-            };
-            
-        factory.getThumbs = function(loc, oldest, radius) {
-            fetch(loc.lat, loc.lng, radius);
+            },
+            // used in conjuction with Instagram.get
+            parseImage = function(imgData) {
+                var p = Photo(imgData.data.data);
+                images.push(p);
+                seenImages[photo.id] = true;
+                activeId = p.id;
+            }
+
+
+        factory.get = function(id) {
+            var url = 
+              "https://api.instagram.com/v1/media/" + id + 
+                "?client_id=" + INSTAGRAM_CLIENT_ID +
+                '&callback=JSON_CALLBACK';
+            $http.jsonp(url, { method: 'GET', timeout: 10000 })
+              .then(parseImage);
         };
 
-        factory.fetch = function(maxTime) {
-            var loc = ClientLocation.location(),
-                radius = radius || defaultRadius;
-            return fetch(loc.lat, loc.lng, radius, maxTime);
+        factory.search = function(maxTime) {
+            var loc = ClientLocation.location();
+            return search(loc.lat, loc.lng, Globals.radius(), maxTime);
         };
 
         // clear out the previously fetched photos
         factory.refresh = function() {
             images = [];
-            this.fetch();
+            this.search();
         };
 
         factory.fetchNext = function() {
-            return this.fetch(maxTime);
+            return this.search(maxTime);
         };
 
         factory.setActive = function(photoId) {
@@ -283,20 +296,23 @@ instanear.factory('Instagram',
             return undefined;
         };
 
-        factory.images = function() { return images; }
+        factory.images = function() { return images; };
+
         return factory;
     }
 ]);
 
 instanear.factory('Maps', 
-    ['$q', '$rootScope', 'ClientLocation',
-    function($q, $rootScope, ClientLocation) {
+    ['$q', '$rootScope', 'ClientLocation', 'Globals', 'Instagram', 
+    function($q, $rootScope, ClientLocation, Globals, Instagram) {
         var factory = {},
             _address = '',
 
             MAP_ELT = 'map',
             map,
             marker,
+            circle,
+            settings = {},
 
             defer = $q.defer(),
 
@@ -305,15 +321,26 @@ instanear.factory('Maps',
             setGeocodeAddress = function(addr) {
                 _address = addr;
                 defer.resolve(addr);
+            },
+  
+            reposition = function(googlePos) {
+                // make it look like it came from the browser
+                ClientLocation.setLocation(
+                    {coords: { latitude: googlePos.latLng.jb, longitude: googlePos.latLng.kb}}
+                );
+                factory.setLocation(ClientLocation.location());
+                factory.markerLocation(ClientLocation.location());
+                factory.drawCircle();
+                Instagram.refresh();
             };
 
-        factory.create = function(eltId, pos) {
+        factory.create = function(pos) {
             if (!map) { 
                 if (!pos) {  
                     pos = ClientLocation.location();
-                    pos = new google.maps.LatLng(pos.lat, pos.lng);
                 }
-                map = new google.maps.Map(document.getElementById(eltId),
+                pos = new google.maps.LatLng(pos.lat, pos.lng);
+                map = new google.maps.Map(document.getElementById(MAP_ELT),
                     { 
                         center: pos,
                         zoom: 13,
@@ -330,6 +357,10 @@ instanear.factory('Maps',
                     animation: google.maps.Animation.DROP,
                     position: pos
                 });
+
+                google.maps.event.addListener(map, 'click', function(e) {
+                    $rootScope.$apply(reposition(e));
+                });
             }
         };
 
@@ -338,12 +369,25 @@ instanear.factory('Maps',
         };
 
         // move the map to addr
-        factory.setLocation = function(pos) {
-            pos = new google.maps.LatLng(pos.lat, pos.lng);
-            
-            this.create(MAP_ELT, pos);
-            marker.setPosition(pos);
+        factory.setLocation = function(pos, rezoom) {
+            if (marker) {
+                pos = new google.maps.LatLng(pos.lat, pos.lng);
+                map.setCenter(pos);
+                if (rezoom) 
+                    map.setZoom(13);
+            }
         };
+
+        factory.markerLocation = function(pos) {
+            if (marker) {
+                if (pos) {
+                    pos = new google.maps.LatLng(pos.lat, pos.lng);
+                    marker.setPosition(pos);
+                }
+                return marker.getPosition();
+            }
+            return undefined;
+        }
 
         factory.reverseGeocode = function(pos) {
             var pt = new google.maps.LatLng(pos.lat, pos.lng);
@@ -357,6 +401,51 @@ instanear.factory('Maps',
             }
             return false;
         };
+
+        factory.drawCircle = function() {
+            var pos = ClientLocation.location();
+            this.removeCircle();
+
+            circle = new google.maps.Circle({
+                center: new google.maps.LatLng(pos.lat, pos.lng),
+                clickable: false,
+                fillColor: '#0055ff',
+                strokeColor: '#0055ff',
+                radius: Globals.radius(),
+                map: map
+            });
+        };
+
+        factory.removeCircle = function() {
+            if (circle) {
+                circle.setMap(null);
+                circle = null;
+            }
+        };
+
+        factory.saveSettings = function(key) {
+            settings[key] = {
+              zoom: map.getZoom(),
+              center: map.getCenter()
+            }
+        }
+        factory.restoreSettings = function(key) {
+            var s = settings[key];
+            if (s) {
+                map.setZoom(s.zoom);
+                map.setCenter(s.center);
+                this.drawCircle();
+            }
+        }
+
+
+        factory.moveTo = function(container) {
+            if ($(container) != $('#' + MAP_ELT).parent()) {
+                $('#' + MAP_ELT).detach().appendTo($(container));
+                google.maps.event.trigger(map, 'resize');
+            }
+        };
+
         return factory;
     }
 ]);
@@ -377,13 +466,10 @@ instanear.controller('pageController',
                     routeParams = $route.current.params;
 
                 if (action === 'details') {
-                    // show detail
-                  // move this to listen to the browser history
-                    $scope.blur = true;
                     Instagram.setActive(routeParams.id);
                 }
-                else if (action === 'config') {
-
+                else if (action === 'location') {
+                    // do nothing                    
                 }
                 else if (action === 'error') {
 
@@ -403,15 +489,20 @@ instanear.controller('pageController',
                         }
                     }
                     else {
-                        ClientLocation.promise().
-                          then(Maps.reverseGeocode).
-                          then(Instagram.fetch)
+                        if (ClientLocation.location()) {
+                            Maps.reverseGeocode(ClientLocation.location()).
+                            then(Instagram.search)
+                        }
+                        else {
+                            ClientLocation.promise().
+                              then(Maps.reverseGeocode).
+                              then(Instagram.search)
+                        }
                     }
                     $scope.blur = false;
                     Instagram.setActive('');
                 }
-                console.log('logging action: ' + action);
-                //BrowserHistory.push(previousRoute, action);
+                BrowserHistory.action(action);
                 return true;
             }
         };
@@ -446,7 +537,7 @@ instanear.controller('thumbCtrl',
         $scope.refresh = function() {
             ClientLocation.promise().
               then($scope.updateLocation).
-              then(Instagram.fetch);
+              then(Instagram.search);
         };
 
         $scope.loadPage = function(newVal, oldVal, scope) {
@@ -467,52 +558,48 @@ instanear.controller('thumbCtrl',
             //$location.path('/detail/' + photoId);
         };
 
+        $scope.watchBlur = function() {
+            $scope.blur = !BrowserHistory.action().match(/^thumbnails/);
+        };
+
         // will deep watch screw me over?
         $scope.$watch(Instagram.images, $scope.loadPage, true); 
+        $scope.$watch(BrowserHistory.action, $scope.watchBlur, true); 
     }
 ]);
 
 instanear.controller('detailCtrl', 
-    ['$scope', '$location', 'Instagram', 'Maps', 'BrowserHistory',
-    function($scope, $location, Instagram, Maps, BrowserHistory) {
+    ['$scope', '$location', '$route', 'Instagram', 'Maps', 'BrowserHistory',
+    function($scope, $location, $route, Instagram, Maps, BrowserHistory) {
         $scope.imageId = null;
         $scope.active = false;
         $scope.photo = undefined;
         fakePhoto = { img: {  url: 'resources/instagram-icon-large.png' } }
 
         $scope.showHide = function() {
-          /*
-             var r = BrowserHistory.route();
-            console.log('making decision about show/hide: ' + r);
-            console.log('last: ' + BrowserHistory.last());
-            */
+            var action = BrowserHistory.action();
             $scope.photo = Instagram.getActive();
-            $scope.photo ? $scope.show() : $scope.hide();
+            // we probably started on the details
+            if (action === 'details' && $scope.photo === undefined) {
+                Instagram.get($route.current.params.id);
+            }
+            else {
+                $scope.photo ? $scope.show() : $scope.hide();
+            }
         };
 
         $scope.show = function() {
-            // being called at $digest time? 
-            //if (showing === 'detail') {
-                var m = $('#map');
-            console.log('showing? ' + $scope.photo);
-                if ($scope.photo) {
-                    if (!m.hasClass('detail-map-container')) {
-                      m = m.detach();
-                      $('#detail-map-container').append(m); 
-
-                      m.removeClass('location');
-                      m.addClass('detail-map-container');
-                    }
-                    
-                    Maps.setLocation($scope.photo.location); 
-                    $scope.active = true;
-                    // setTimeout here to delay load?
-                }
+            if ($scope.photo) {
+                Maps.moveTo('#detail-map-container');
+                Maps.markerLocation($scope.photo.location); 
+                Maps.setLocation($scope.photo.location, true); 
+                Maps.removeCircle();
+                $scope.active = true;
+            }
         };
 
         $scope.hide = function() {
             if ($scope.active) {
-                console.log('hiding? ' + BrowserHistory.lastRoute());
                 $scope.active = false; 
                 $scope.photo = undefined; 
                 BrowserHistory.route(BrowserHistory.lastRoute());
@@ -524,38 +611,46 @@ instanear.controller('detailCtrl',
 ]);
 
 instanear.controller('locationCtrl',
-    ['$scope', 'Maps', 'ClientLocation', 'BrowserHistory',
-    function($scope, Maps, ClientLocation, BrowserHistory) {
+    ['$scope', 'Globals', 'Maps', 'ClientLocation', 'BrowserHistory', 'Instagram',
+    function($scope, Globals, Maps, ClientLocation, BrowserHistory, Instagram) {
         $scope.active = false; 
-        $scope.show = function(page) {
-            if (page === 'location') {
-                var m = $('#map');
-                if (!m.hasClass('detail')) {
-                    m = m.detach();
-                    $('#detail-map-container').append(m); 
 
-                    m.removeClass('location');
-                    m.addClass('detail');
-                }
-                Maps.setLocation(ClientLocation.location()); 
-            }
-        };
         $scope.hide = function() {
             $scope.active = false; 
             var prev = BrowserHistory.pop();
-            //$location.path(prev);
             BrowserHistory.route(prev);
         };
-        //$scope.$watch(BrowserHistory.last, $scope.show); 
+
+        $scope.showHide = function() {
+            var action = BrowserHistory.action();
+            // we probably started on the details
+            action === 'location' ? $scope.show() : $scope.hide();
+        };
+
+        $scope.show = function() {
+            Maps.moveTo('#location-map-container');
+            Maps.restoreSettings('location-config');
+            Maps.markerLocation(ClientLocation.location()); 
+            $scope.active = true;
+        };
+
+        $scope.hide = function() {
+            if ($scope.active) {
+                $scope.active = false; 
+                BrowserHistory.route(BrowserHistory.lastRoute());
+                Maps.saveSettings('location-config');
+            }
+        };
+        $scope.radius = function(r) {
+            if (r) {
+                Globals.radius(r);
+                Maps.drawCircle();
+            }
+            return Globals.radius();
+        }
+        $scope.$watch(BrowserHistory.action, $scope.showHide);
     }
 ]);
-
-instanear.controller('locationCtrl',
-    ['$scope', '$location', 'Instagram', 'Maps', 'ClientLocation',
-    function($scope, $location, Instagram, Maps, ClientLocation) {
-        
-    }]
-);
 
 instanear.controller('errorCtrl', 
     ['Error', '$location',
@@ -563,7 +658,6 @@ instanear.controller('errorCtrl',
         $scope.displayError = function() {
             var msg = Error.getError();
             // route to error
-            //$location.path('/error')
             BrowserHistory.route('/error')
         };
 
@@ -575,10 +669,10 @@ instanear.directive('tap', function() {
     var tap = false;
     return function(scope, elt, attrs) {
         elt.bind('touchstart', function() {
-            return tap = true;
+            tap = true;
         });
         elt.bind('touchmove', function() {
-            return tap = false;
+            tap = false;
         });
         elt.bind('click', function() {
             scope.$apply(attrs['tap']);
@@ -586,7 +680,7 @@ instanear.directive('tap', function() {
 
         return elt.bind('touchend', function() {
             if (tap) {
-                return scope.$apply(attrs['tap']);
+                scope.$apply(attrs['tap']);
             }
         });
     }
@@ -607,14 +701,7 @@ instanear.directive('loaded', function() {
             i.onload = function() {
                 n.style.backgroundImage = 'url(' + i.src + ')';
             }
-            //scope.$apply(attrs['loaded']);
         }
-          /*
-        scope: { loaded: '=' },
-        controller: function($scope, $element, $attrs, $location) {
-            $scope.loaded($element);
-        }
-            */
     }
 });
 
@@ -664,3 +751,7 @@ instanear.directive('blur', function() {
         };
     }
 );
+
+instanear.run(['ClientLocation', 'Maps', function(ClientLocation, Maps) {
+    ClientLocation.promise().then(Maps.create);
+}]);
