@@ -276,6 +276,7 @@ instanear.factory('Instagram',
         // clear out the previously fetched photos
         factory.refresh = function() {
             images = [];
+            maxTime = 99999999999;
             this.search();
         };
 
